@@ -1,0 +1,14 @@
+{
+  "name": "vendorbridge-app",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "concurrently -n server,client -c magenta,cyan \"pnpm --filter vendorbridge-server dev\" \"pnpm --filter vendorbridge-client dev\"",
+    "dev:server": "pnpm --filter vendorbridge-server dev",
+    "dev:client": "pnpm --filter vendorbridge-client dev",
+    "build": "pnpm --filter vendorbridge-server build && pnpm --filter vendorbridge-client build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

@@ -1,0 +1,229 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  PROCUREMENT_OFFICER
+  MANAGER
+  VENDOR
+}
+
+enum RfqStatus {
+  DRAFT
+  SENT
+  CLOSED
+  CANCELLED
+}
+
+enum QuotationStatus {
+  DRAFT
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+}
+
+enum ApprovalDecision {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum POStatus {
+  DRAFT
+  ISSUED
+  FULFILLED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  GENERATED
+  SENT
+  PAID
+}
+
+enum VendorStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum EntityType {
+  RFQ
+  QUOTATION
+  PO
+  INVOICE
+  VENDOR
+  USER
+}
+
+model User {
+  id                String    @id @default(cuid())
+  firstName         String
+  lastName          String
+  username          String    @unique
+  email             String    @unique
+  passwordHash      String
+  phone             String?
+  country           String?
+  avatarUrl         String?
+  bio               String?
+  role              UserRole  @default(PROCUREMENT_OFFICER)
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+  createdAt         DateTime  @default(now())
+  lastLoginAt       DateTime?
+
+  vendor            Vendor?
+  rfqsCreated       Rfq[]               @relation("RfqCreator")
+  approvals         Approval[]          @relation("Approver")
+  purchaseOrders    PurchaseOrder[]     @relation("POCreator")
+  activityLogs      ActivityLog[]
+  notifications     Notification[]
+}
+
+model Vendor {
+  id               String       @id @default(cuid())
+  userId           String       @unique
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationName String
+  gstNo            String?
+  address          Json?
+  category         String
+  status           VendorStatus @default(ACTIVE)
+  rating           Float?
+  createdAt        DateTime     @default(now())
+
+  rfqVendors       RfqVendor[]
+  quotations       Quotation[]
+  purchaseOrders   PurchaseOrder[]
+}
+
+model Rfq {
+  id          String    @id @default(cuid())
+  title       String
+  category    String
+  description String?
+  deadline    DateTime
+  attachments Json      @default("[]")
+  items       Json
+  createdById String
+  createdBy   User      @relation("RfqCreator", fields: [createdById], references: [id])
+  status      RfqStatus @default(DRAFT)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  rfqVendors  RfqVendor[]
+  quotations  Quotation[]
+}
+
+model RfqVendor {
+  rfqId     String
+  rfq       Rfq      @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  vendorId  String
+  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  invitedAt DateTime @default(now())
+  viewedAt  DateTime?
+
+  @@id([rfqId, vendorId])
+}
+
+model Quotation {
+  id           String          @id @default(cuid())
+  rfqId        String
+  rfq          Rfq             @relation(fields: [rfqId], references: [id])
+  vendorId     String
+  vendor       Vendor          @relation(fields: [vendorId], references: [id])
+  items        Json
+  subAmount    Float
+  gstTax       Float           @default(18)
+  discount     Float           @default(0)
+  totalAmount  Float
+  deliveryDays Int
+  paymentTerms String?
+  note         String?
+  status       QuotationStatus @default(DRAFT)
+  submittedAt  DateTime?
+  updatedAt    DateTime        @updatedAt
+
+  approval     Approval?
+  purchaseOrder PurchaseOrder?
+
+  @@unique([rfqId, vendorId])
+  @@index([rfqId])
+}
+
+model Approval {
+  id           String           @id @default(cuid())
+  quotationId  String           @unique
+  quotation    Quotation        @relation(fields: [quotationId], references: [id])
+  approverId   String
+  approver     User             @relation("Approver", fields: [approverId], references: [id])
+  decision     ApprovalDecision @default(PENDING)
+  remarks      String?
+  decidedAt    DateTime?
+  createdAt    DateTime         @default(now())
+}
+
+model PurchaseOrder {
+  id          String    @id @default(cuid())
+  poNumber    String    @unique
+  quotationId String    @unique
+  quotation   Quotation @relation(fields: [quotationId], references: [id])
+  vendorId    String
+  vendor      Vendor    @relation(fields: [vendorId], references: [id])
+  createdById String
+  createdBy   User      @relation("POCreator", fields: [createdById], references: [id])
+  totalAmount Float
+  status      POStatus  @default(ISSUED)
+  createdAt   DateTime  @default(now())
+
+  invoice     Invoice?
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  poId          String        @unique
+  po            PurchaseOrder @relation(fields: [poId], references: [id])
+  amount        Float
+  taxAmount     Float
+  totalAmount   Float
+  status        InvoiceStatus @default(GENERATED)
+  pdfPath       String?
+  generatedAt   DateTime      @default(now())
+  sentAt        DateTime?
+}
+
+model ActivityLog {
+  id         String     @id @default(cuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id])
+  action     String
+  entityType EntityType
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime   @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+}
+
+model Notification {
+  id         String     @id @default(cuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id])
+  type       String
+  title      String
+  body       String
+  entityType EntityType?
+  entityId   String?
+  readAt     DateTime?
+  createdAt  DateTime   @default(now())
+
+  @@index([userId])
+}
