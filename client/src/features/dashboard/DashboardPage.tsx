@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuthStore } from "@/lib/auth";
@@ -14,6 +14,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import {
   FileText, Building2, ShoppingCart, Receipt, Plus, CheckSquare, TrendingUp, ArrowRight, Sparkles,
 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -28,13 +29,40 @@ export function DashboardPage() {
   const isPO = user?.role === "PROCUREMENT_OFFICER";
   const isAdmin = user?.role === "ADMIN";
 
-  const totalSpend = (pos as Array<{ totalAmount: number }>).reduce((s, p) => s + p.totalAmount, 0);
+  const posArray = pos as Array<{ id: string; poNumber: string; status: string; totalAmount: number; createdAt: string; vendor: { organizationName: string } }>;
+  const totalSpend = posArray.reduce((s, p) => s + p.totalAmount, 0);
   const loadingStats = rfqsLoading || appLoading || posLoading || invLoading;
+
+  const spendByVendor = useMemo(() => {
+    const map = new Map<string, number>();
+    posArray.forEach(po => {
+      const name = po.vendor?.organizationName || "Unknown";
+      map.set(name, (map.get(name) || 0) + po.totalAmount);
+    });
+    return Array.from(map.entries())
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
+  }, [posArray]);
+
+  const spendOverTime = useMemo(() => {
+    const aggregated = posArray.reduce((acc: Record<string, number>, po) => {
+      const d = new Date(po.createdAt).toISOString().split("T")[0];
+      acc[d] = (acc[d] || 0) + po.totalAmount;
+      return acc;
+    }, {});
+    return Object.entries(aggregated)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, total]) => ({
+        date: new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+        total
+      }));
+  }, [posArray]);
 
   const stats: Array<{ show: boolean; label: string; value: string | number; icon: React.ReactNode; color: string; route: string }> = [
     { show: isPO || isAdmin, label: "Active RFQs", value: rfqs.length, icon: <FileText size={18} />, color: "from-blue-500 to-cyan-500", route: "/app/rfqs" },
     { show: isManager || isAdmin, label: "Pending Approvals", value: (pendingApprovals as []).length, icon: <CheckSquare size={18} />, color: "from-amber-500 to-orange-500", route: "/app/approvals" },
-    { show: true, label: "Purchase Orders", value: (pos as []).length, icon: <ShoppingCart size={18} />, color: "from-emerald-500 to-teal-500", route: "/app/purchase-orders" },
+    { show: true, label: "Purchase Orders", value: posArray.length, icon: <ShoppingCart size={18} />, color: "from-emerald-500 to-teal-500", route: "/app/purchase-orders" },
     { show: true, label: "Total Spend", value: formatCurrency(totalSpend), icon: <TrendingUp size={18} />, color: "from-violet-500 to-fuchsia-500", route: "/app/reports" },
   ];
   const visibleStats = stats.filter(s => s.show);
@@ -85,6 +113,67 @@ export function DashboardPage() {
         </div>
       )}
 
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Spend Over Time</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[300px]">
+            {!loadingStats && spendOverTime.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={spendOverTime} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground) / 0.2)" />
+                  <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} dy={10} />
+                  <YAxis tickFormatter={(val) => `$${val}`} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                  <RechartsTooltip 
+                    contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    formatter={(value: number) => [formatCurrency(value), "Spend"]}
+                  />
+                  <Area type="monotone" dataKey="total" stroke="#8b5cf6" strokeWidth={2} fillOpacity={1} fill="url(#colorTotal)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full grid place-items-center text-sm text-muted-foreground">
+                {loadingStats ? "Loading chart data..." : "Not enough data to display"}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Top Vendors by Spend</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[300px]">
+            {!loadingStats && spendByVendor.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={spendByVendor} layout="vertical" margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--muted-foreground) / 0.2)" />
+                  <XAxis type="number" tickFormatter={(val) => `$${val}`} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis type="category" dataKey="name" width={100} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                  <RechartsTooltip 
+                    contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    cursor={{ fill: 'hsl(var(--secondary))' }}
+                    formatter={(value: number) => [formatCurrency(value), "Spend"]}
+                  />
+                  <Bar dataKey="total" fill="#06b6d4" radius={[0, 4, 4, 0]} barSize={24} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full grid place-items-center text-sm text-muted-foreground">
+                {loadingStats ? "Loading chart data..." : "Not enough data to display"}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader><CardTitle className="text-base">Quick actions</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap gap-2.5">
@@ -114,7 +203,7 @@ export function DashboardPage() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-1">
-            {(pos as Array<{ id: string; poNumber: string; status: string; totalAmount: number; createdAt: string; vendor: { organizationName: string } }>).slice(0, 5).map(po => (
+            {posArray.slice(0, 5).map(po => (
               <div
                 key={po.id}
                 className="flex items-center justify-between py-2.5 px-2 cursor-pointer hover:bg-secondary/50 rounded-md transition-colors"
@@ -130,7 +219,7 @@ export function DashboardPage() {
                 </div>
               </div>
             ))}
-            {!posLoading && (pos as []).length === 0 && (
+            {!posLoading && posArray.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-6">No purchase orders yet</p>
             )}
           </CardContent>
