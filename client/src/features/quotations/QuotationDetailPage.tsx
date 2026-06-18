@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { ArrowLeft } from "lucide-react";
 
-export function QuotationDetailPage() {
+export default function QuotationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: q, isLoading } = useQuotation(id!);

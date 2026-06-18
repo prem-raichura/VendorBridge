@@ -11,7 +11,7 @@ import { formatCurrency, formatDateTime } from "@/lib/format";
 import { ArrowLeft, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
-export function ApprovalDetailPage() {
+export default function ApprovalDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: approval, isLoading } = useApproval(id!);
