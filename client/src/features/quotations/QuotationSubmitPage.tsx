@@ -16,7 +16,7 @@ import { ArrowLeft } from "lucide-react";
 
 type Form = z.infer<typeof SubmitQuotationSchema>;
 
-export function QuotationSubmitPage() {
+export default function QuotationSubmitPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const rfqId = params.get("rfq") || "";

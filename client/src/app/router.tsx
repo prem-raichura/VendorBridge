@@ -1,4 +1,4 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/lib/auth";
 import { AppShell } from "@/components/layout/AppShell";
@@ -17,11 +17,11 @@ import { RfqListPage } from "@/features/rfqs/RfqListPage";
 import { RfqCreatePage } from "@/features/rfqs/RfqCreatePage";
 import { RfqDetailPage } from "@/features/rfqs/RfqDetailPage";
 import { QuotationComparePage } from "@/features/compare/QuotationComparePage";
-import { QuotationListPage } from "@/features/quotations/QuotationListPage";
-import { QuotationSubmitPage } from "@/features/quotations/QuotationSubmitPage";
-import { QuotationDetailPage } from "@/features/quotations/QuotationDetailPage";
-import { ApprovalQueuePage } from "@/features/approvals/ApprovalQueuePage";
-import { ApprovalDetailPage } from "@/features/approvals/ApprovalDetailPage";
+const QuotationListPage = lazy(() => import("@/features/quotations/QuotationListPage"));
+const QuotationSubmitPage = lazy(() => import("@/features/quotations/QuotationSubmitPage"));
+const QuotationDetailPage = lazy(() => import("@/features/quotations/QuotationDetailPage"));
+const ApprovalQueuePage = lazy(() => import("@/features/approvals/ApprovalQueuePage"));
+const ApprovalDetailPage = lazy(() => import("@/features/approvals/ApprovalDetailPage"));
 import { POListPage } from "@/features/purchase-orders/POListPage";
 import { PODetailPage } from "@/features/purchase-orders/PODetailPage";
 import { InvoiceListPage } from "@/features/invoices/InvoiceListPage";
@@ -41,7 +41,8 @@ export function AppRouter() {
 
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <Routes>
+      <Suspense fallback={<div className="h-screen w-full flex items-center justify-center text-muted-foreground">Loading...</div>}>
+        <Routes>
         <Route path="/" element={user ? <Navigate to="/app/dashboard" replace /> : <LandingPage />} />
         <Route path="/login" element={user ? <Navigate to="/app/dashboard" replace /> : <LoginPage />} />
         <Route path="/signup" element={user ? <Navigate to="/app/dashboard" replace /> : <SignupPage />} />
@@ -76,7 +77,8 @@ export function AppRouter() {
         {/* Legacy routes redirect to /app */}
         <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }
