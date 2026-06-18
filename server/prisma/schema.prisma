@@ -3,62 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
-}
-
-enum UserRole {
-  ADMIN
-  PROCUREMENT_OFFICER
-  MANAGER
-  VENDOR
-}
-
-enum RfqStatus {
-  DRAFT
-  SENT
-  CLOSED
-  CANCELLED
-}
-
-enum QuotationStatus {
-  DRAFT
-  SUBMITTED
-  ACCEPTED
-  REJECTED
-}
-
-enum ApprovalDecision {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-enum POStatus {
-  DRAFT
-  ISSUED
-  FULFILLED
-  CANCELLED
-}
-
-enum InvoiceStatus {
-  GENERATED
-  SENT
-  PAID
-}
-
-enum VendorStatus {
-  ACTIVE
-  INACTIVE
-}
-
-enum EntityType {
-  RFQ
-  QUOTATION
-  PO
-  INVOICE
-  VENDOR
-  USER
 }
 
 model User {
@@ -72,7 +18,7 @@ model User {
   country           String?
   avatarUrl         String?
   bio               String?
-  role              UserRole  @default(PROCUREMENT_OFFICER)
+  role              String    @default("PROCUREMENT_OFFICER")
   resetToken        String?
   resetTokenExpiry  DateTime?
   createdAt         DateTime  @default(now())
@@ -92,9 +38,9 @@ model Vendor {
   user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organizationName String
   gstNo            String?
-  address          Json?
+  address          String?
   category         String
-  status           VendorStatus @default(ACTIVE)
+  status           String       @default("ACTIVE")
   rating           Float?
   createdAt        DateTime     @default(now())
 
@@ -109,11 +55,11 @@ model Rfq {
   category    String
   description String?
   deadline    DateTime
-  attachments Json      @default("[]")
-  items       Json
+  attachments String      @default("[]")
+  items       String
   createdById String
   createdBy   User      @relation("RfqCreator", fields: [createdById], references: [id])
-  status      RfqStatus @default(DRAFT)
+  status      String    @default("DRAFT")
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -138,7 +84,7 @@ model Quotation {
   rfq          Rfq             @relation(fields: [rfqId], references: [id])
   vendorId     String
   vendor       Vendor          @relation(fields: [vendorId], references: [id])
-  items        Json
+  items        String
   subAmount    Float
   gstTax       Float           @default(18)
   discount     Float           @default(0)
@@ -146,7 +92,7 @@ model Quotation {
   deliveryDays Int
   paymentTerms String?
   note         String?
-  status       QuotationStatus @default(DRAFT)
+  status       String          @default("DRAFT")
   submittedAt  DateTime?
   updatedAt    DateTime        @updatedAt
 
@@ -163,7 +109,7 @@ model Approval {
   quotation    Quotation        @relation(fields: [quotationId], references: [id])
   approverId   String
   approver     User             @relation("Approver", fields: [approverId], references: [id])
-  decision     ApprovalDecision @default(PENDING)
+  decision     String           @default("PENDING")
   remarks      String?
   decidedAt    DateTime?
   createdAt    DateTime         @default(now())
@@ -179,7 +125,7 @@ model PurchaseOrder {
   createdById String
   createdBy   User      @relation("POCreator", fields: [createdById], references: [id])
   totalAmount Float
-  status      POStatus  @default(ISSUED)
+  status      String    @default("ISSUED")
   createdAt   DateTime  @default(now())
 
   invoice     Invoice?
@@ -193,7 +139,7 @@ model Invoice {
   amount        Float
   taxAmount     Float
   totalAmount   Float
-  status        InvoiceStatus @default(GENERATED)
+  status        String        @default("GENERATED")
   pdfPath       String?
   generatedAt   DateTime      @default(now())
   sentAt        DateTime?
@@ -204,9 +150,9 @@ model ActivityLog {
   userId     String
   user       User       @relation(fields: [userId], references: [id])
   action     String
-  entityType EntityType
+  entityType String
   entityId   String
-  metadata   Json?
+  metadata   String?
   createdAt  DateTime   @default(now())
 
   @@index([entityType, entityId])
@@ -220,7 +166,7 @@ model Notification {
   type       String
   title      String
   body       String
-  entityType EntityType?
+  entityType String?
   entityId   String?
   readAt     DateTime?
   createdAt  DateTime   @default(now())
